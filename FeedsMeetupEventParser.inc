@@ -1,6 +1,6 @@
 <?php
 // XXX UTC offset?
-// XXX uniqueness!
+
 /**
  * @file
  * Feeds parser class for FeedsMeetupEventParser.
@@ -192,7 +192,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $lat = '';
         $lon = '';
       }
-
+      
       $item = array(
         'guid' => (string) $entry->id,
         'title' => (string) $entry->name,
@@ -217,13 +217,13 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         'group_name' => (string) $entry->group->name,
         'group_pronoun' => (string) $entry->group->who,
         'group_url' => 'http://www.meetup.com/' . $entry->group->urlname,
-        'utc_offset' => (string) $this->msToSeconds($entry->utc_offset),
-        'event_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->time))),
-        'event_timestamp' => strtotime($this->msToSeconds($entry->time)),
-        'updated_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->updated))),
-        'updated_timestamp' => strtotime($this->msToSeconds($entry->updated)),
-        'published_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->created))),
-        'published_timestamp' => strtotime($this->msToSeconds($entry->created)),
+        'utc_offset' => $this->msToSeconds((string) $entry->utc_offset),
+        'event_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->time)),
+        'event_timestamp' => $this->msToSeconds((string) $entry->time),
+        'updated_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->updated)),
+        'updated_timestamp' => $this->msToSeconds((string) $entry->updated),
+        'published_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->created)),
+        'published_timestamp' => $this->msToSeconds((string) $entry->created),
       );
 
       // Populate the FeedsFetcherResult object with the parsed results.
