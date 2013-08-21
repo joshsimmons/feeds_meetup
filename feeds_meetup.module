@@ -1,0 +1,286 @@
+<?php 
+
+/**
+ * @file
+ * Adds a Meetup event feed processor to the Feeds module.
+ */
+
+// http://api.meetup.com/2/events.xml/?sign=true&group_id=1811169&key=377c682266112e355a7a435d4dd2021
+//
+ 
+/**
+ * Implements ctools_plugin_api().
+ */
+
+function feeds_meetup_ctools_plugin_api($owner, $api) {
+  if ($owner == 'feeds' && $api == 'plugins') {
+    return array('version' => 1);
+  }
+}
+
+/**
+ * Implements hook_feeds_plugins().
+ */
+function feeds_meetup_feeds_plugins() {
+  $info = array();
+  $info['FeedsMeetupEventParser'] = array(
+    'name' => 'Meetup.com event parser',
+    'description' => 'Parse Meetup event feeds.',
+    'help' => 'Use PHP SimpleXML parser to parse Meetup event feeds.',
+    'handler' => array(
+      'parent' => 'FeedsXPathParserXML',
+      'class' => 'FeedsMeetupEventParser',
+      'file' => 'FeedsMeetupEventParser.inc',
+      'path' => drupal_get_path('module', 'feeds_meetup'),
+    ),
+  );
+  $info['FeedsMeetupEventProcessor'] = array(
+    'name' => 'Meetup.com event processor',
+    'description' => 'Process Meetup event feeds.',
+    'help' => 'Create and update nodes from parsed Meetup event feeds.',
+    'handler' => array(
+      'parent' => 'FeedsNodeProcessor',
+      'class' => 'FeedsMeetupEventProcessor',
+      'file' => 'FeedsMeetupEventProcessor.inc',
+      'path' => drupal_get_path('module', 'feeds_meetup'),
+    ),
+  );
+  return $info;
+}
+
+/**
+ * Implements hook_enable().
+ */
+function feeds_meetup_enable() {
+  //clear the cache to display in Feeds as available plugin.
+  cache_clear_all('plugins:feeds:plugins', 'cache');
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ------------------ TARGET: SOURCE
+
+/**
+ * Implementation of hook_feeds_node_processor_targets_alter().
+ */
+function feeds_meetup_feeds_processor_targets_alter(&$target, $type, $bundle) {
+  if ($bundle == 'events') {
+    $targets['field_source'] = array(
+      'name' => t('Source URL'),
+      'description' => t('Shows up in legend on mapping form.'),
+      'callback' => 'meetup_importer_set_target', // See 2)
+    );
+  }
+}
+/**
+ * Mapping callback.
+ */
+function feeds_meetup_set_target($node, $target, $value) {
+  if (!is_array($value)) {
+    $node->$target = $value;
+  }
+  print_r($node);
+  print_r($target);
+  print_r($value);
+  exit();
+}
+
+// ---------------- MEETUP PROCESSOR
+class MeetupProcessor extends FeedsProcessor {
+
+  /**
+  * Parses a raw string and populates FeedsImportBatch object from it.
+  */
+  public function process(FeedsSource $source, FeedsParserResult $parser_result) {
+    
+  }
+  
+} 
+
+/**
+ * @file
+ * Class definition of FeedsNodeProcessor.
+ */
+
+/**
+ * Creates nodes from feed items.
+ */
+
+
+// TODO create feed processor targets
+/*
+ * Implements hook_cron()
+ * DEPRECATED IN LIEU OF FEEDS IMPORTER. May decide to bring this back as a way to grab extra details for integration.
+ */
+/*function meetup_importer_cron() {
+	$groups = array(1811169, // wimp
+					3382482, // content strategy
+					4175842, // lean ux
+					1076215, // agile
+					1770219, // tech entre
+					1784438, // ruby on rails
+					1161199, // bay area int marketers
+					//1611731, // west county photogs
+					//1440521, // so co photogs
+					2106911, // wine country wordpress
+					3620972, // startup grind
+					1761039, // nbay software qa
+					4460362, // north coast score
+					4349312, // social butterfly networking group
+					);
+	
+	$nodes = meetup_importer_get_future_events();
+	
+	foreach ($nodes as $node) {
+		$event_urls[$node->field_source['und'][0]['url']] = $node->changed;
+	}
+	
+	foreach ($groups as $group_id) {
+		$events = meetup_importer_call_api('2/events', array('group_id' => $group_id));
+
+		foreach ($events->results as $event) {
+			$event_url = $event->event_url;
+
+			if ($drupal_updated = $event_urls[$event_url]) {
+				$meetup_updated = $event->updated / 1000;
+				//if ($meetup_updated > $drupal_updated) {
+					meetup_importer_update_event($event);
+				//}
+			}
+			
+			if (empty($event_urls[$event_url]) &&
+				$event->visibility == 'public' &&
+				$event->status == 'upcoming') {
+					meetup_importer_save_event($event);
+			}
+		}
+	}
+}
+
+function meetup_importer_save_event($meetup_event) {	
+	$e = entity_create('node', array('type' => 'event'));
+	
+	$e = meetup_importer_copy_to_node($e, $meetup_event);
+
+	entity_save('node', $e);
+}
+
+// update an event that is in drupal but meetup's copy is newer
+function meetup_importer_update_event($meetup_event) {
+  $query = new EntityFieldQuery();
+  
+  $query
+    ->entityCondition('entity_type', 'node')
+	->entityCondition('bundle', 'event')
+	->fieldCondition('field_source', 'url', $meetup_event->event_url, '=');
+	
+  $result = $query->execute();
+  
+  if(isset($result['node'])) {
+  	foreach($result['node'] as $record) {
+  	  $nid = $record->nid;
+      $nodes = entity_load('node', array($nid));
+	  $node = $nodes[$nid];
+  	}
+  }
+  $node = meetup_importer_copy_to_node($node, $meetup_event);
+  entity_save('node', $node);
+}
+
+function meetup_importer_copy_to_node($e, $meetup_event) {
+	// meetup records time in milliseconds since the epoch. php does it in seconds... so... yeah.
+	$offset = $meetup_event->utc_offset / 1000;
+	$time = $meetup_event->time / 1000;
+	$duration = $meetup_event->duration / 1000;
+	$time = $time - $offset;
+	
+	$comments = meetup_importer_call_api('2/event_comments', array('event_id' => $meetup_event->id));
+	
+	$body_prepend = "";//"<p>From <a href=\"http://meetup.com/{$meetup_event->group->urlname}\">Meetup.com</a>'s {$meetup_event->group->name}. </p>";
+	
+	$e->title = $meetup_event->name;
+	$e->body = array(LANGUAGE_NONE => array(0 => array('value' => $body_prepend .
+															$meetup_event->description,
+														'format' => 'full_html')));
+	$e->field_source = array(LANGUAGE_NONE => array(0 => array('url' => $meetup_event->event_url)));
+	$e->field_time = array(LANGUAGE_NONE => array(0 => array('value' => date('Y-m-d H:i:s', $time),
+															'value2' => date('Y-m-d H:i:s', $time + $duration),
+															'timezone' => 'America/Los_Angeles',
+															'timezone_db' => 'UTC',
+															'date_type' => 'datetime')));
+	$e->field_location = array(LANGUAGE_NONE => array(0 => array('country' => strtoupper($meetup_event->venue->country),
+																'administrative_area' => $meetup_event->venue->state,
+																'locality' => $meetup_event->venue->city,
+																'postal_code' => $meetup_event->venue->zip,
+																'thoroughfare' => $meetup_event->venue->address_1,
+																'organisation_name' => str_replace(' http://somobc.org/directions.html', '', $meetup_event->venue->name))));
+	$e->field_host = array(LANGUAGE_NONE => array(0 => array('value' => $meetup_event->group->name)));
+	$e->field_rsvp = array(LANGUAGE_NONE => array(0 => array('value' => $meetup_event->yes_rsvp_count)));
+	$e->field_comments = array(LANGUAGE_NONE => array(0 => array('value' => $comments->meta->count)));
+	return $e;
+}
+
+// load all future event nodes w/ meetup source field
+function meetup_importer_get_future_events() {
+  $query = new EntityFieldQuery();
+  
+  $query
+    ->entityCondition('entity_type', 'node')
+	->entityCondition('bundle', 'event')
+	->fieldCondition('field_source', 'url', '%meetup.com%', 'LIKE')
+	->fieldCondition('field_time', 'value', date('Y-m-d H:i:s'), '>=');
+	
+  $result = $query->execute();
+  
+  $events = array();
+  foreach($result['node'] as $record) {
+  	$nids[] = $record->nid;
+  }
+  $events = entity_load('node', $nids);
+  return $events;
+}
+
+function meetup_importer_call_api($function, $values) {
+	$api_base = 'https://api.meetup.com/';
+	$api_key = '377c682266112e355a7a435d4dd2021';
+	
+	$request_url = $api_base . $function . '?key=' . $api_key . '&sign=true';
+	foreach($values as $k => $v){
+		$request_url .= '&' . $k . '=' . $v;
+	}
+	
+ * 
+ * https://api.meetup.com/2/groups.xml/?key=377c682266112e355a7a435d4dd2021&sign=true
+	$data = file_get_contents($request_url);
+	return json_decode($data);
+}
+
+*/
