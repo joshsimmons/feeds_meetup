@@ -35,7 +35,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
       @$sxml = simplexml_load_string($meetup_feed, NULL, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NOCDATA);
     }
 
-    // Got a malformed XML.
+    // Got malformed XML.
     if ($sxml === FALSE || is_null($sxml)) {
       throw new Exception(t('FeedsMeetupEventParser: Malformed XML source.'));
     }
@@ -269,19 +269,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         'published_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->created)),
         'published_timestamp' => $this->msToSeconds((string) $entry->created),
       );
-
-/* TODO add:
- *  how_to_find_us
- *  fee/
- *    <label>Price</label>
-      <accepts>paypal</accepts>
-      <currency>USD</currency>
-      <description>per awesome person</description>
-      <amount>30.0</amount>
-      <required>1</required>
- * 
- * */
-
+      
       // Populate the FeedsFetcherResult object with the parsed results.
       $result->items[] = $item;
     }
@@ -289,7 +277,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
   }
 
   /**
-   *  Adjust millisecond Unix timestamp to second.
+   *  Adjust millisecond-based Unix timestamp to second-based.
    *
    *  @param $seconds
    *    The number of seconds to display.
@@ -299,10 +287,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
   }
 
   /**
-   *  Adjust timestamp to UTC. 
-   * XXX do I need to detect default timezone?
-   * XXX depends on how field is stored ... we'll see
-   *
+   *  @todo Adjust timestamp to UTC. 
    *  @param $seconds
    *    The number of seconds to display.
    */
