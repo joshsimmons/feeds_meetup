@@ -113,27 +113,6 @@ function feeds_meetup_set_target($node, $target, $value) {
   exit();
 }
 
-// ---------------- MEETUP PROCESSOR
-class MeetupProcessor extends FeedsProcessor {
-
-  /**
-  * Parses a raw string and populates FeedsImportBatch object from it.
-  */
-  public function process(FeedsSource $source, FeedsParserResult $parser_result) {
-    
-  }
-  
-} 
-
-/**
- * @file
- * Class definition of FeedsNodeProcessor.
- */
-
-/**
- * Creates nodes from feed items.
- */
-
 
 // TODO create feed processor targets
 /*
