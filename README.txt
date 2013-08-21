@@ -1,7 +1,7 @@
 Feeds: Meetup
 ============
 
-A Meetup feed parser and processor for Drupal, extending the Feeds and Feeds XPath Parser modules.
+A Meetup feed parser for Drupal, extending the Feeds and Feeds XPath Parser modules.
 
 Features
 ========
