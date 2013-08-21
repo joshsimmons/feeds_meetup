@@ -21,24 +21,13 @@ function feeds_meetup_ctools_plugin_api($owner, $api) {
 function feeds_meetup_feeds_plugins() {
   $info = array();
   $info['FeedsMeetupEventParser'] = array(
-    'name' => 'Meetup.com event parser',
+    'name' => 'Meetup event parser',
     'description' => 'Parse Meetup event feeds.',
-    'help' => 'Use PHP SimpleXML parser to parse Meetup event feeds.',
+    'help' => 'Parse Meetup event XML feeds using XPath.',
     'handler' => array(
       'parent' => 'FeedsXPathParserXML',
       'class' => 'FeedsMeetupEventParser',
       'file' => 'FeedsMeetupEventParser.inc',
-      'path' => drupal_get_path('module', 'feeds_meetup'),
-    ),
-  );
-  $info['FeedsMeetupEventProcessor'] = array(
-    'name' => 'Meetup.com event processor',
-    'description' => 'Process Meetup event feeds.',
-    'help' => 'Create and update nodes from parsed Meetup event feeds.',
-    'handler' => array(
-      'parent' => 'FeedsNodeProcessor',
-      'class' => 'FeedsMeetupEventProcessor',
-      'file' => 'FeedsMeetupEventProcessor.inc',
       'path' => drupal_get_path('module', 'feeds_meetup'),
     ),
   );

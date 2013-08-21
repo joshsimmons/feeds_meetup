@@ -1,5 +1,6 @@
 <?php
-
+// XXX UTC offset?
+// XXX uniqueness!
 /**
  * @file
  * Feeds parser class for FeedsMeetupEventParser.
@@ -11,7 +12,7 @@
  * Parses XML feeds returned from Meetup API event call
  */
 class FeedsMeetupEventParser extends FeedsXPathParserXML {
-
+  
   /**
    * Parse the extra mapping sources provided by this parser.
    *
@@ -21,10 +22,8 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
    * @see FeedsParser::parse()
    */
   public function parse(FeedsSource $source, FeedsFetcherResult $fetcher_result) {
-
     $meetup_feed = $fetcher_result->getRaw();
     $result = new FeedsParserResult();
-
 
     /**
     * @see common_syndication_parser_parse()
@@ -42,7 +41,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
     }
 
     // Run parsing
-    $result = $this->parseXml($sxml, $source, $fetcher_result);
+    $result = $this->parseMeetup($sxml, $source, $fetcher_result);
 
     return $result;
   }
@@ -52,158 +51,179 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
    */
   public function getMappingSources() {
     return parent::getMappingSources() + array(
-      'feed_title' => array(
-        'name' => t('Feed title'),
-        'description' => t('The title of the pulled feed.'),
-      ),
       'guid' => array(
-        'name' => t('GUID'),
-      ),
-      'video_id' => array(
-        'name' => t('Video ID'),
-        'description' => t('YouTube video unique ID.'),
+        'name' => t('Event ID (GUID)'),
       ),
       'title' => array(
-        'name' => t('Video title'),
-        'description' => t('Video title.'),
+        'name' => t('Event title'),
+        'description' => t('Event title.'),
       ),
-      'author' => array(
-        'name' => t('Author'),
-        'description' => t('Author or uploader of the video.'),
+      'event_id' => array(
+        'name' => t('Event ID'),
+        'description' => t('Meetup event unique ID.'),
       ),
-      'updated_datetime' => array(
-        'name' => t('Updated on (Datetime)'),
+      'event_timestamp' => array(
+        'name' => t('Event time (Timestamp)'),
+      ),
+      'event_datetime' => array(
+        'name' => t('Event time (Datetime)'),
+      ),
+      'utc_offset' => array(
+        'name' => t('UTC offset'),
+        'description' => t('Offset of timestamps from UTC.'),
       ),
       'updated_timestamp' => array(
         'name' => t('Updated on (Timestamp)'),
       ),
-      'published_datetime' => array(
-        'name' => t('Published on (Datetime)'),
+      'updated_datetime' => array(
+        'name' => t('Updated on (Datetime)'),
       ),
       'published_timestamp' => array(
         'name' => t('Published on (Timestamp)'),
       ),
+      'published_datetime' => array(
+        'name' => t('Published on (Datetime)'),
+      ),
       'description' => array(
         'name' => t('Description'),
       ),
-      'thumbnail' => array(
-        'name' => t('Thumbnail'),
-        'description' => t('URL of the thumbnail of the video.'),
+      'event_url' => array(
+        'name' => t('Event URL'),
+        'description' => t('The URL of the event.'),
       ),
-      'category' => array(
-        'name' => t('Category'),
+      'rsvp_yes' => array(
+        'name' => t('"Yes" RSVP count'),
       ),
-      'tags' => array(
-        'name' => t('Tags'),
-        'description' => t('This can be imported directly with Taxonomy "tags" vocabularies.'),
+      'rsvp_maybe' => array(
+        'name' => t('"Maybe" RSVP count'),
       ),
-      'watch_page' => array(
-        'name' => t('Watch page'),
-        'description' => t('The URL of the video.'),
+      'waitlist' => array(
+        'name' => t('Waitlist count'),
       ),
-      'url' => array(
-        'name' => t('Video URL'),
-        'description' => t('The URL of the video.'),
+      'headcount' => array(
+        'name' => t('Headcount'),
       ),
-      'duration' => array(
-        'name' => t('Duration (Formatted)'),
-        'description' => t('Duration of the video in HH:MM:SS format.'),
+      'group_name' => array(
+        'name' => t('Group name'),
+        'description' => t('The name of the hosting Meetup group.'),
       ),
-      'duration_raw' => array(
-        'name' => t('Duration (Seconds)'),
-        'description' => t('Duration of the video in number of seconds.'),
+      'group_url' => array(
+        'name' => t('Group URL'),
+        'description' => t('The URL of the hosting Meetup group.'),
       ),
-      'fav_count' => array(
-        'name' => t('Favorite count'),
+      'group_id' => array(
+        'name' => t('Group ID'),
+        'description' => t('The ID of the hosting Meetup group.'),
       ),
-      'view_count' => array(
-        'name' => t('View count'),
+      'group_pronoun' => array(
+        'name' => t('Group pronoun'),
+        'description' => t('The pronoun the hosting Meetup group uses to describe its members.'),
       ),
-      'rating' => array(
-        'name' => t('Rating'),
+      'venue_name' => array(
+        'name' => t('Venue name'),
+      ),
+      'venue_id' => array(
+        'name' => t('Venue ID'),
+      ),
+      'address_1' => array(
+        'name' => t('Address line 1'),
+      ),
+      'address_2' => array(
+        'name' => t('Address line 2'),
+      ),
+      'city' => array(
+        'name' => t('City'),
+      ),
+      'zip' => array(
+        'name' => t('Zip'),
+      ),
+      'state' => array(
+        'name' => t('State'),
+      ),
+      'country' => array(
+        'name' => t('Country'),
+      ),
+      'lat' => array(
+        'name' => t('Latitude'),
+      ),
+      'lon' => array(
+        'name' => t('Longitude'),
       ),
     );
   }
 
   /**
-   * Parse RSS 2.0 feed
+   * Parse XML feed
    *
    * @param SimpleXMLElement $sxml
    * @param FeedsFetcherResult $fetcher_result
    * @param FeedsSource $source
    */
-  private function parseXml(SimpleXMLElement $sxml, FeedsSource $source, FeedsFetcherResult $fetcher_result) {
-
+  private function parseMeetup(SimpleXMLElement $sxml, FeedsSource $source, FeedsFetcherResult $fetcher_result) {
     // XML was parsed successfully, so we can begin to process items
     $result = new FeedsParserResult();
-    $fetcher_result->title = (string) $sxml->channel->title;
-    $fetcher_result->description = (string) $sxml->channel->description;
-    $fetcher_result->link = (string) $sxml->channel->link;
-    $feed_title = (string) $sxml->channel->title;
+    $fetcher_result->title = (string) $sxml->head->title;
+    $fetcher_result->description = (string) $sxml->head->description;
+    $fetcher_result->link = (string) $sxml->head->url;
+    $feed_title = (string) $sxml->head->title;
 
     // Iterate over entries in feed
-    // TODO: This is not DRY - extract things which is same in Atom and RSS20 to common method
     foreach ($sxml->xpath('//item') as $entry) {
-
-      // Get atom nodes
-      $atom = $entry->children('http://www.w3.org/2005/Atom');
-      $updated = $atom->updated;
-
-      // Get video ID
-      $id = end(explode('/', $entry->guid));
-
-      // Get nodes in media: namespace for media information
-      $media = $entry->children('http://search.yahoo.com/mrss/');
-
-      // Get video player URL
-      $attrs = $media->group->player->attributes();
-      $player = (string) $attrs['url'];
-
-      // Get video thumbnail
-      $attrs = $media->group->thumbnail[0]->attributes();
-      $thumbnail = (string) $attrs['url'];
-
-      // Get <yt:duration> node for video length
-      $yt = $media->children('http://gdata.youtube.com/schemas/2007');
-      $attrs = $yt->duration->attributes();
-      $length = (int) $attrs['seconds'];
-
-      // Get <yt:stats> node for viewer statistics
-      $yt = $entry->children('http://gdata.youtube.com/schemas/2007');
-      $attrs = $yt->statistics->attributes();
-      $viewCount = (int) $attrs['viewCount'];
-      $favCount = (int) $attrs['favoriteCount'];
-
-      // Get <gd:rating> node for video ratings
-      $gd = $entry->children('http://schemas.google.com/g/2005');
-      $rating = 0;
-      if ($gd->rating) {
-        $attrs = $gd->rating->attributes();
-        $rating = (int) $attrs['average'];
+      if(isset($entry->venue)) {
+        $venue_name = (isset($entry->venue->name)) ? (string) $entry->venue->name : '';
+        $venue_id = (isset($entry->venue->id)) ? (string) $entry->venue->id : '';
+        $address_1 = (isset($entry->venue->address_1)) ? (string) $entry->venue->address_1 : '';
+        $address_2 = (isset($entry->venue->address_2)) ? (string) $entry->venue->address_2 : '';
+        $city = (isset($entry->venue->city)) ? (string) $entry->venue->city : '';
+        $zip = (isset($entry->venue->zip)) ? (string) $entry->venue->zip : '';
+        $state = (isset($entry->venue->state)) ? (string) $entry->venue->state : '';
+        $country = (isset($entry->venue->country)) ? (string) $entry->venue->country : '';
+        $lat = (isset($entry->venue->lat)) ? (string) $entry->venue->lat : '';
+        $lon = (isset($entry->venue->lon)) ? (string) $entry->venue->lon : '';
+      } else {
+        $venue_name = '';
+        $venue_id = '';
+        $address_1 = '';
+        $address_2 = '';
+        $city = '';
+        $zip = '';
+        $state = '';
+        $country = '';
+        $lat = '';
+        $lon = '';
       }
 
       $item = array(
-        'feed_title' => $feed_title,
-        'guid' => (string) $entry->guid,
-        'video_id' => $id,
-        'url' => 'http://www.youtube.com/watch?v=' . $id,
-        'watch_page' => 'http://www.youtube.com/watch?v=' . $id,
-        'title' => html_entity_decode((string) $media->group->title),
-        'author' => (string) $entry->author,
-        'description' => html_entity_decode((string) $media->group->description),
-        'thumbnail' => $thumbnail,
-        'category' => (string) $media->group->category,
-        'tags' => explode(',', (string) $media->group->keywords),
-        'embedded_player' => $player,
-        'duration' => $this->secsToTime($length),
-        'duration_raw' => $length,
-        'view_count' => $viewCount,
-        'fav_count' => $favCount,
-        'rating' => $rating,
-        'updated_datetime' => date('Y-m-d H:i:s', strtotime($updated)),
-        'updated_timestamp' => strtotime($updated),
-        'published_datetime' => date('Y-m-d H:i:s', strtotime($entry->pubDate)),
-        'published_timestamp' => strtotime($entry->pubDate),
+        'guid' => (string) $entry->id,
+        'title' => (string) $entry->name,
+        'event_id' => (string) $entry->id,
+        'event_url' => (string) $entry->event_url,
+        'description' => (string) $entry->description,
+        'headcount' => (string) $entry->headcount,
+        'waitlist' => (string) $entry->waitlist_count,
+        'rsvp_yes' => (string) $entry->yes_rsvp_count,
+        'rsvp_maybe' => (string) $entry->maybe_rsvp_count,
+        'venue_name' => (string) $venue_name,
+        'venue_id' => (string) $venue_id,
+        'address_1' => (string) $address_1,
+        'address_2' => (string) $address_2,
+        'city' => (string) $city,
+        'zip' => (string) $zip,
+        'state' => (string) $state,
+        'country' => (string) $country,
+        'lat' => (string) $lat,
+        'lon' => (string) $lon,
+        'group_id' => (string) $entry->group->id,
+        'group_name' => (string) $entry->group->name,
+        'group_pronoun' => (string) $entry->group->who,
+        'group_url' => 'http://www.meetup.com/' . $entry->group->urlname,
+        'utc_offset' => (string) $this->msToSeconds($entry->utc_offset),
+        'event_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->time))),
+        'event_timestamp' => strtotime($this->msToSeconds($entry->time)),
+        'updated_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->updated))),
+        'updated_timestamp' => strtotime($this->msToSeconds($entry->updated)),
+        'published_datetime' => date('Y-m-d H:i:s', strtotime($this->msToSeconds($entry->created))),
+        'published_timestamp' => strtotime($this->msToSeconds($entry->created)),
       );
 
       // Populate the FeedsFetcherResult object with the parsed results.
@@ -212,4 +232,26 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
     return $result;
   }
 
+  /**
+   *  Adjust millisecond Unix timestamp to second.
+   *
+   *  @param $seconds
+   *    The number of seconds to display.
+   */
+  public function msToSeconds($milliseconds) {
+    return $milliseconds / 1000;
+  }
+
+  /**
+   *  Adjust timestamp to UTC. 
+   * XXX do I need to detect default timezone?
+   * XXX depends on how field is stored ... we'll see
+   *
+   *  @param $seconds
+   *    The number of seconds to display.
+   */
+  public function offsetTime($time, $offset) {
+    
+    return $time;
+  }
 }
