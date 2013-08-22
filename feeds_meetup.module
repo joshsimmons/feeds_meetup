@@ -1,14 +1,13 @@
-<?php 
+<?php
 
 /**
  * @file
  * Adds a Meetup event feed processor to the Feeds module.
  */
- 
+
 /**
  * Implements ctools_plugin_api().
  */
-
 function feeds_meetup_ctools_plugin_api($owner, $api) {
   if ($owner == 'feeds' && $api == 'plugins') {
     return array('version' => 1);

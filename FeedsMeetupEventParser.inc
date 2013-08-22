@@ -1,6 +1,4 @@
 <?php
-// XXX UTC offset?
-
 /**
  * @file
  * Feeds parser class for FeedsMeetupEventParser.
@@ -12,22 +10,15 @@
  * Parses XML feeds returned from Meetup API event call
  */
 class FeedsMeetupEventParser extends FeedsXPathParserXML {
-  
+
   /**
-   * Parse the extra mapping sources provided by this parser.
-   *
-   * @param $fetcher_result FeedsFetcherResult
-   * @param $source FeedsSource
-   *
-   * @see FeedsParser::parse()
+   * Implements FeedsParser::parse().
    */
   public function parse(FeedsSource $source, FeedsFetcherResult $fetcher_result) {
     $meetup_feed = $fetcher_result->getRaw();
     $result = new FeedsParserResult();
 
-    /**
-    * @see common_syndication_parser_parse()
-    */
+    // @see common_syndication_parser_parse()
     if (!defined('LIBXML_VERSION') || (version_compare(phpversion(), '5.1.0', '<'))) {
       @$sxml = simplexml_load_string($meetup_feed, NULL);
     }
@@ -35,12 +26,12 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
       @$sxml = simplexml_load_string($meetup_feed, NULL, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NOCDATA);
     }
 
-    // Got malformed XML.
+    // Got malformed XML?
     if ($sxml === FALSE || is_null($sxml)) {
       throw new Exception(t('FeedsMeetupEventParser: Malformed XML source.'));
     }
 
-    // Run parsing
+    // Parse Meetup XML.
     $result = $this->parseMeetup($sxml, $source, $fetcher_result);
 
     return $result;
@@ -174,23 +165,25 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
   }
 
   /**
-   * Parse XML feed
+   * Parse Meetup XML feed.
    *
    * @param SimpleXMLElement $sxml
-   * @param FeedsFetcherResult $fetcher_result
+   *   Meetup XML feed.
    * @param FeedsSource $source
+   *   Metadata regarding Meetup XML feed.
+   * @param FeedsFetcherResult $fetcher_result
+   *   Return value.
    */
-  private function parseMeetup(SimpleXMLElement $sxml, FeedsSource $source, FeedsFetcherResult $fetcher_result) {
-    // XML was parsed successfully, so we can begin to process items
+  protected function parseMeetup(SimpleXMLElement $sxml, FeedsSource $source, FeedsFetcherResult $fetcher_result) {
+    // XML was parsed successfully, so we can begin to process items.
     $result = new FeedsParserResult();
     $fetcher_result->title = (string) $sxml->head->title;
     $fetcher_result->description = (string) $sxml->head->description;
     $fetcher_result->link = (string) $sxml->head->url;
-    $feed_title = (string) $sxml->head->title;
 
-    // Iterate over entries in feed
+    // Iterate over entries in feed.
     foreach ($sxml->xpath('//item') as $entry) {
-      if(isset($entry->venue)) {
+      if (isset($entry->venue)) {
         $venue_name = (isset($entry->venue->name)) ? (string) $entry->venue->name : '';
         $venue_id = (isset($entry->venue->id)) ? (string) $entry->venue->id : '';
         $address_1 = (isset($entry->venue->address_1)) ? (string) $entry->venue->address_1 : '';
@@ -201,7 +194,8 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $country = (isset($entry->venue->country)) ? (string) $entry->venue->country : '';
         $lat = (isset($entry->venue->lat)) ? (string) $entry->venue->lat : '';
         $lon = (isset($entry->venue->lon)) ? (string) $entry->venue->lon : '';
-      } else {
+      }
+      else {
         $venue_name = '';
         $venue_id = '';
         $address_1 = '';
@@ -213,15 +207,16 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $lat = '';
         $lon = '';
       }
-      
-      if(isset($entry->fee)) {
+
+      if (isset($entry->fee)) {
         $fee_type = (isset($entry->fee->label)) ? (string) $entry->fee->label : '';
         $fee_required = (isset($entry->fee->required)) ? (string) $entry->fee->required : '';
         $fee_amount = (isset($entry->fee->amount)) ? (string) $entry->fee->amount : '';
         $fee_currency = (isset($entry->fee->currency)) ? (string) $entry->fee->currency : '';
         $fee_accepts = (isset($entry->fee->accepts)) ? (string) $entry->fee->accepts : '';
         $fee_description = (isset($entry->fee->description)) ? (string) $entry->fee->description : '';
-      } else {
+      }
+      else {
         $fee_type = '';
         $fee_required = '';
         $fee_amount = '';
@@ -229,7 +224,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $fee_accepts = '';
         $fee_description = '';
       }
-      
+
       $item = array(
         'guid' => (string) $entry->id,
         'title' => (string) $entry->name,
@@ -244,7 +239,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         'venue_name' => (string) $venue_name,
         'venue_id' => (string) $venue_id,
         'address_1' => (string) $address_1,
-        'address_2' => (string) $address_2, 
+        'address_2' => (string) $address_2,
         'city' => (string) $city,
         'zip' => (string) $zip,
         'state' => (string) $state,
@@ -269,7 +264,7 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         'published_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->created)),
         'published_timestamp' => $this->msToSeconds((string) $entry->created),
       );
-      
+
       // Populate the FeedsFetcherResult object with the parsed results.
       $result->items[] = $item;
     }
@@ -277,22 +272,16 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
   }
 
   /**
-   *  Adjust millisecond-based Unix timestamp to second-based.
-   *
-   *  @param $seconds
-   *    The number of seconds to display.
+   * Adjust millisecond-based Unix timestamp to second-based.
    */
-  public function msToSeconds($milliseconds) {
+  protected function msToSeconds($milliseconds) {
     return $milliseconds / 1000;
   }
 
   /**
-   *  @todo Adjust timestamp to UTC. 
-   *  @param $seconds
-   *    The number of seconds to display.
+   * @todo Adjust timestamp based on UTC offset.
    */
-  public function offsetTime($time, $offset) {
-    
+  protected function offsetTime($time, $offset) {
     return $time;
   }
 }
