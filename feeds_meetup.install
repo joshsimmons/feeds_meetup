@@ -11,6 +11,9 @@
 function feeds_meetup_enable() {
   // Clear the cache to display in Feeds as available plugin.
   cache_clear_all('plugins:feeds:plugins', 'cache');
+
+  // Clear static cache to ensure uncached plugins.
+  ctools_get_plugins_reset();
 }
 
 /**

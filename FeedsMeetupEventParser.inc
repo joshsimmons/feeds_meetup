@@ -9,71 +9,42 @@
  *
  * Parses XML feeds returned from Meetup API event call
  */
-class FeedsMeetupEventParser extends FeedsXPathParserXML {
-
-  /**
-   * Implements FeedsParser::parse().
-   */
-  public function parse(FeedsSource $source, FeedsFetcherResult $fetcher_result) {
-    $meetup_feed = $fetcher_result->getRaw();
-    $result = new FeedsParserResult();
-
-    // @see common_syndication_parser_parse()
-    if (!defined('LIBXML_VERSION') || (version_compare(phpversion(), '5.1.0', '<'))) {
-      @$sxml = simplexml_load_string($meetup_feed, NULL);
-    }
-    else {
-      @$sxml = simplexml_load_string($meetup_feed, NULL, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NOCDATA);
-    }
-
-    // Got malformed XML?
-    if ($sxml === FALSE || is_null($sxml)) {
-      throw new Exception(t('FeedsMeetupEventParser: Malformed XML source.'));
-    }
-
-    // Parse Meetup XML.
-    $result = $this->parseMeetup($sxml, $source, $fetcher_result);
-
-    return $result;
-  }
+class FeedsMeetupEventParser extends FeedsMeetupParserBase {
 
   /**
    * Add the extra mapping sources provided by this parser.
    */
   public function getMappingSources() {
     return parent::getMappingSources() + array(
-      'guid' => array(
-        'name' => t('Event ID (GUID)'),
-      ),
       'title' => array(
         'name' => t('Event title'),
         'description' => t('Event title.'),
       ),
-      'event_id' => array(
+      'id' => array(
         'name' => t('Event ID'),
         'description' => t('Meetup event unique ID.'),
       ),
       'event_timestamp' => array(
-        'name' => t('Event time (Timestamp)'),
+        'name' => t('Event time (timestamp)'),
       ),
       'event_datetime' => array(
-        'name' => t('Event time (Datetime)'),
+        'name' => t('Event time (datetime)'),
       ),
       'utc_offset' => array(
         'name' => t('UTC offset'),
         'description' => t('Offset of timestamps from UTC.'),
       ),
       'updated_timestamp' => array(
-        'name' => t('Updated on (Timestamp)'),
+        'name' => t('Updated on (timestamp)'),
       ),
       'updated_datetime' => array(
-        'name' => t('Updated on (Datetime)'),
+        'name' => t('Updated on (datetime)'),
       ),
       'published_timestamp' => array(
-        'name' => t('Published on (Timestamp)'),
+        'name' => t('Published on (timestamp)'),
       ),
       'published_datetime' => array(
-        'name' => t('Published on (Datetime)'),
+        'name' => t('Published on (datetime)'),
       ),
       'description' => array(
         'name' => t('Description'),
@@ -183,6 +154,30 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
 
     // Iterate over entries in feed.
     foreach ($sxml->xpath('//item') as $entry) {
+      $item = array(
+        'title' => (string) $entry->name,
+        'id' => (string) $entry->id,
+        'event_url' => (string) $entry->event_url,
+        'description' => (string) $entry->description,
+        'headcount' => (string) $entry->headcount,
+        'how_to_find_us' => (string) $entry->how_to_find_us,
+        'waitlist' => (string) $entry->waitlist_count,
+        'rsvp_yes' => (string) $entry->yes_rsvp_count,
+        'rsvp_maybe' => (string) $entry->maybe_rsvp_count,
+        'group_id' => (string) $entry->group->id,
+        'group_name' => (string) $entry->group->name,
+        'group_pronoun' => (string) $entry->group->who,
+        'group_url' => 'http://www.meetup.com/' . (string) $entry->group->urlname,
+        'utc_offset' => _feeds_meetup_msToSeconds((string) $entry->utc_offset),
+        'event_datetime' => date('Y-m-d H:i:s', _feeds_meetup_msToSeconds((string) $entry->time)),
+        'event_timestamp' => _feeds_meetup_msToSeconds((string) $entry->time),
+        'updated_datetime' => date('Y-m-d H:i:s', _feeds_meetup_msToSeconds((string) $entry->updated)),
+        'updated_timestamp' => _feeds_meetup_msToSeconds((string) $entry->updated),
+        'published_datetime' => date('Y-m-d H:i:s', _feeds_meetup_msToSeconds((string) $entry->created)),
+        'published_timestamp' => _feeds_meetup_msToSeconds((string) $entry->created),
+      );
+
+      // Extract venue details if a venue is specified.
       if (isset($entry->venue)) {
         $venue_name = (isset($entry->venue->name)) ? (string) $entry->venue->name : '';
         $venue_id = (isset($entry->venue->id)) ? (string) $entry->venue->id : '';
@@ -194,20 +189,22 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $country = (isset($entry->venue->country)) ? (string) $entry->venue->country : '';
         $lat = (isset($entry->venue->lat)) ? (string) $entry->venue->lat : '';
         $lon = (isset($entry->venue->lon)) ? (string) $entry->venue->lon : '';
-      }
-      else {
-        $venue_name = '';
-        $venue_id = '';
-        $address_1 = '';
-        $address_2 = '';
-        $city = '';
-        $zip = '';
-        $state = '';
-        $country = '';
-        $lat = '';
-        $lon = '';
+
+        $item += array(
+          'venue_name' => (string) $venue_name,
+          'venue_id' => (string) $venue_id,
+          'address_1' => (string) $address_1,
+          'address_2' => (string) $address_2,
+          'city' => (string) $city,
+          'zip' => (string) $zip,
+          'state' => (string) $state,
+          'country' => (string) $country,
+          'lat' => (string) $lat,
+          'lon' => (string) $lon,
+        );
       }
 
+      // Extract fee details if a fee is specified.
       if (isset($entry->fee)) {
         $fee_type = (isset($entry->fee->label)) ? (string) $entry->fee->label : '';
         $fee_required = (isset($entry->fee->required)) ? (string) $entry->fee->required : '';
@@ -215,73 +212,20 @@ class FeedsMeetupEventParser extends FeedsXPathParserXML {
         $fee_currency = (isset($entry->fee->currency)) ? (string) $entry->fee->currency : '';
         $fee_accepts = (isset($entry->fee->accepts)) ? (string) $entry->fee->accepts : '';
         $fee_description = (isset($entry->fee->description)) ? (string) $entry->fee->description : '';
-      }
-      else {
-        $fee_type = '';
-        $fee_required = '';
-        $fee_amount = '';
-        $fee_currency = '';
-        $fee_accepts = '';
-        $fee_description = '';
-      }
 
-      $item = array(
-        'guid' => (string) $entry->id,
-        'title' => (string) $entry->name,
-        'event_id' => (string) $entry->id,
-        'event_url' => (string) $entry->event_url,
-        'description' => (string) $entry->description,
-        'headcount' => (string) $entry->headcount,
-        'how_to_find_us' => (string) $entry->how_to_find_us,
-        'waitlist' => (string) $entry->waitlist_count,
-        'rsvp_yes' => (string) $entry->yes_rsvp_count,
-        'rsvp_maybe' => (string) $entry->maybe_rsvp_count,
-        'venue_name' => (string) $venue_name,
-        'venue_id' => (string) $venue_id,
-        'address_1' => (string) $address_1,
-        'address_2' => (string) $address_2,
-        'city' => (string) $city,
-        'zip' => (string) $zip,
-        'state' => (string) $state,
-        'country' => (string) $country,
-        'lat' => (string) $lat,
-        'lon' => (string) $lon,
-        'fee_type' => (string) $fee_type,
-        'fee_required' => (string) $fee_required,
-        'fee_amount' => (string) $fee_amount,
-        'fee_currency' => (string) $fee_currency,
-        'fee_accepts' => (string) $fee_accepts,
-        'fee_description' => (string) $fee_description,
-        'group_id' => (string) $entry->group->id,
-        'group_name' => (string) $entry->group->name,
-        'group_pronoun' => (string) $entry->group->who,
-        'group_url' => 'http://www.meetup.com/' . (string) $entry->group->urlname,
-        'utc_offset' => $this->msToSeconds((string) $entry->utc_offset),
-        'event_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->time)),
-        'event_timestamp' => $this->msToSeconds((string) $entry->time),
-        'updated_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->updated)),
-        'updated_timestamp' => $this->msToSeconds((string) $entry->updated),
-        'published_datetime' => date('Y-m-d H:i:s', $this->msToSeconds((string) $entry->created)),
-        'published_timestamp' => $this->msToSeconds((string) $entry->created),
-      );
+        $item += array(
+          'fee_type' => (string) $fee_type,
+          'fee_required' => (string) $fee_required,
+          'fee_amount' => (string) $fee_amount,
+          'fee_currency' => (string) $fee_currency,
+          'fee_accepts' => (string) $fee_accepts,
+          'fee_description' => (string) $fee_description,
+        );
+      }
 
       // Populate the FeedsFetcherResult object with the parsed results.
       $result->items[] = $item;
     }
     return $result;
-  }
-
-  /**
-   * Adjust millisecond-based Unix timestamp to second-based.
-   */
-  protected function msToSeconds($milliseconds) {
-    return $milliseconds / 1000;
-  }
-
-  /**
-   * @todo Adjust timestamp based on UTC offset.
-   */
-  protected function offsetTime($time, $offset) {
-    return $time;
   }
 }

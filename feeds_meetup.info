@@ -1,7 +1,11 @@
 name = Feeds: Meetup
-description = Adds a Meetup XML feed parser to the Feeds module.
+description = Adds Meetup XML feed parsers to the Feeds module.
 core = 7.x
 dependencies[] = "feeds"
-dependencies[] = "feeds_xpathparser"
+dependencies[] = "ctools"
+dependencies[] = "job_scheduler"
 package = Feeds
+files[] = FeedsMeetupParserBase.inc
 files[] = FeedsMeetupEventParser.inc
+files[] = FeedsMeetupGroupParser.inc
+files[] = FeedsMeetupVenueParser.inc
